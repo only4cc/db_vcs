@@ -1,0 +1,6 @@
+master
+tempdb
+model
+msdb
+INFOMART
+DBA

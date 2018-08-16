@@ -1,0 +1,76 @@
+REM
+REM   JTS 03-Mayo-2018
+REM 
+
+set SERVERNAME=%1
+set USERNAME=%2
+set PASS=%3
+set ORG=%4
+
+perl C:\e-contact\admin\mssql-scripter\db_scv\exp.pl   %SERVERNAME% %USERNAME% %PASS% %ORG%
+
+GOTO:eof
+
+For /f "tokens=2-4 delims=/ " %%a in ('date /t') do (set mydate=%%c-%%a-%%b)
+REM For /f "tokens=1-2 delims=/:" %%a in ('time /t') do (set mytime=%%a%%b)
+set TS=%mydate%
+REM _%time%       (sin uso)
+
+set FNAME=%SERVERNAME%_%TS%.sql
+set DIREXP=C:\e-contact\admin\mssql-scripter\exp
+
+echo creando directorio local %DIREXP%\local\%ORG%\%SERVERNAME%
+mkdir %DIREXP%\local\%ORG%\%SERVERNAME%
+
+echo creando directorio para git %DIREXP%\SQL%%20Server\server\%ORG%\%SERVERNAME%
+mkdir %DIREXP%\SQL%%20Server\server\%ORG%\%SERVERNAME%
+
+REM Script name en Git
+set F2GIT=C:\e-contact\admin\mssql-scripter\exp\SQL%%20Server\server\%ORG%\%SERVERNAME%\%SERVERNAME%.sql
+
+echo Obteniendo nombres de bbdd en %SERVERNAME% ...
+call C:\e-contact\admin\mssql-scripter\db_scv\dbnames.bat %SERVERNAME% %USERNAME% %PASS%
+
+echo Generare %DIREXP%\%FNAME%  ...
+REM call mssql-scripter --server %SERVERNAME% --user %USERNAME% --password %PASS% --continue-on-error --logins --object-permissions --display-progress -f %DIREXP%\local\%ORG%\%SERVERNAME%\%FNAME%
+perl C:\e-contact\admin\mssql-scripter\db_scv\itera_scr.pl  %DIREXP% %ORG% %FNAME% %SERVERNAME% %USERNAME% %PASS%
+REM pause
+
+echo eliminando comentarios con fecha ...
+perl C:\e-contact\admin\mssql-scripter\db_scv\clean.pl %DIREXP%\local\%ORG%\%SERVERNAME%\%FNAME% > %DIREXP%\local\%ORG%\%SERVERNAME%\%FNAME%.sincom
+
+echo moviendo para control de versiones ...
+echo desde  %DIREXP%\local\%ORG%\%SERVERNAME%\%FNAME%.sincom   
+echo hasta  %F2GIT%
+
+copy   %DIREXP%\local\%ORG%\%SERVERNAME%\%FNAME%.sincom   %F2GIT%
+
+del %DIREXP%\local\%ORG%\%SERVERNAME%\%FNAME%.sincom
+
+REM --------------------- Acciones para TFS ---------------------------
+
+cd C:\e-contact\admin\mssql-scripter\exp\SQL%%20Server
+
+echo enviando a repositorio ...
+
+echo git add %F2GIT%
+git add %F2GIT%
+echo --------------------------------
+
+echo git pull
+git pull 
+echo --------------------------------
+
+echo git commit -m "%SERVERNAME% %TS% %time%"
+git commit -m "%SERVERNAME% %TS% %time%"
+echo --------------------------------
+
+echo git push -v --force origin master
+REM --force --signed=false
+git push -v  --force origin master 
+
+REM volviendo a directorio del batch ...
+cd C:\e-contact\admin\mssql-scripter\db_scv
+
+
+
